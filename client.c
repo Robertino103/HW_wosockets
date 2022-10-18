@@ -18,8 +18,15 @@
 
 int main()
 {
-    mknod("srv-cli.fifo", S_IFIFO | 0666, 0);
-    mknod("cli-srv.fifo", S_IFIFO | 0666, 0);
+    if (access("srv-cli.fifo", F_OK) == -1)
+    {
+        mknod("srv-cli.fifo", S_IFIFO | 0666, 0);
+    }
+
+    if (access("cli-srv.fifo", F_OK) == -1)
+    {
+        mknod("cli-srv.fifo", S_IFIFO | 0666, 0);
+    }
 
     char command_buffer[MAX_BUFFER_SIZE];
 
@@ -29,21 +36,27 @@ int main()
         int srv_cli_fd = open("srv-cli.fifo", O_RDONLY);
         int cli_srv_fd = open("cli-srv.fifo", O_WRONLY);
         fgets(command_buffer, sizeof(command_buffer), stdin);
-        no_sent_bytes = write(cli_srv_fd, command_buffer, strlen(command_buffer));
-
-        char rcv_msg[MAX_BUFFER_SIZE];
-        rcv_msg[0] = '\0';
-        int rcv_len = read(srv_cli_fd, rcv_msg, sizeof(rcv_msg));
-        rcv_msg[rcv_len] = '\0';
-        printf("%s\n", rcv_msg);
-
-        if(strncmp("You've been disconnected", rcv_msg, 24) == 0)
+        if(strlen(command_buffer) > 1) 
         {
-            return 0;
-        }
+            no_sent_bytes = write(cli_srv_fd, command_buffer, strlen(command_buffer));
 
-        close(srv_cli_fd);
-        close(cli_srv_fd);
+            char rcv_msg[MAX_BUFFER_SIZE];
+            rcv_msg[0] = '\0';
+            int rcv_len = read(srv_cli_fd, rcv_msg, sizeof(rcv_msg));
+            if (rcv_len < 0)
+            {
+                printf("Error reading message from server! (%d)\n", errno);
+                printf("%s\n", strerror(errno));
+                exit(EXIT_FAILURE);
+            }
+            rcv_msg[rcv_len] = '\0';
+            printf("%s\n", rcv_msg);
+
+            if(strncmp("You've been disconnected", rcv_msg, 24) == 0)
+            {
+                return 0;
+            }
+        }
 
     } while (1);
 
