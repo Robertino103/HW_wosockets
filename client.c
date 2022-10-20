@@ -39,6 +39,7 @@ int main()
         if(strlen(command_buffer) > 1) 
         {
             no_sent_bytes = write(cli_srv_fd, command_buffer, strlen(command_buffer));
+            sleep(0.2);
 
             char rcv_msg[MAX_BUFFER_SIZE];
             rcv_msg[0] = '\0';

@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <utmp.h>
+#include <time.h>
 
 #define READ 0
 #define WRITE 1
@@ -20,25 +21,30 @@
 
 bool check_message(char buf[MAX_BUFFER_SIZE], int len)
 {
-    if (strncmp("login : ", buf, 8) == 0) return true;
-    if (strncmp("get-logged-users", buf, len-1) == 0) return true;
-    if (strncmp("get-proc-info : ", buf, 16) == 0) return true;
-    if (strncmp("logout", buf, len-1) == 0) return true;
-    if (strncmp("quit", buf, len-1) == 0) return true;
+    if (strncmp("login : ", buf, 8) == 0)
+        return true;
+    if (strncmp("get-logged-users", buf, len - 1) == 0)
+        return true;
+    if (strncmp("get-proc-info : ", buf, 16) == 0)
+        return true;
+    if (strncmp("logout", buf, len-1) == 0)
+        return true;
+    if (strncmp("quit", buf, len - 1) == 0)
+        return true;
     return false;
 }
 
 bool is_logged = false;
 
-char* exec_login(char *user)
-{   
+char *exec_login(char *user)
+{
     int found = 0;
     FILE *login_fd;
     char *line = NULL;
     size_t len_line = 0;
     ssize_t read;
     login_fd = fopen("users.cfg", "r");
-    
+
     if (login_fd == NULL)
     {
         printf("No config file found ! (%d)\n", errno);
@@ -46,46 +52,50 @@ char* exec_login(char *user)
     }
     while ((read = getline(&line, &len_line, login_fd)) != -1)
     {
-        if(strncmp(user, line, strlen(user)) == 0) found = 1;
+        if (strncmp(user, line, strlen(user)) == 0)
+            found = 1;
     }
     fclose(login_fd);
-    if(line) free(line);
-    
-    
-    if(found == 0) return "User not found!";
-    else 
+    if (line)
+        free(line);
+
+    if (found == 0)
+        return "User not found!";
+    else
     {
-        if(is_logged == false) return "CONNECTED";
-        else return "Already connected";
+        if (is_logged == false)
+            return "CONNECTED";
+        else
+            return "Already connected";
     }
 }
 
-char* exec_get_logged_users()
+char *exec_get_logged_users()
 {
-    if(is_logged == true)
+    if (is_logged == true)
     {
-        char *msg = malloc(sizeof (char) * MAX_BUFFER_SIZE);
+        char *msg = malloc(sizeof(char) * MAX_BUFFER_SIZE);
         struct utmp *info;
         setutent();
         info = getutent();
         FILE *fd = fopen("userinfo.txt", "w");
 
-        while(info)
+        while (info)
         {
-            if(info->ut_type==USER_PROCESS) 
+            if (info->ut_type == USER_PROCESS)
             {
                 fprintf(fd, "%s - %s - %d:%d\n", info->ut_user, info->ut_host, info->ut_tv.tv_sec, info->ut_tv.tv_usec);
             }
             info = getutent();
         }
-
+        
         fclose(fd);
 
         FILE *fd_read = fopen("userinfo.txt", "r");
 
         char usr_buff[1000];
 
-        while(fgets(usr_buff, sizeof(usr_buff), fd_read))
+        while (fgets(usr_buff, sizeof(usr_buff), fd_read))
         {
             strcat(msg, usr_buff);
             strcat(msg, ".");
@@ -94,75 +104,58 @@ char* exec_get_logged_users()
         fclose(fd_read);
         return msg;
     }
-    else return "User not connected. Please connect to run this command";
+    else
+        return "User not connected. Please connect to run this command";
 }
 
-char* exec_get_proc_info(char *pid)
+char *exec_get_proc_info(char *pid)
 {
     if (is_logged == true)
     {
-        char *path = malloc(sizeof (char) * MAX_BUFFER_SIZE);
+        char path[MAX_BUFFER_SIZE];
+        path[0] = '\0';
         strcat(path, "/proc/");
-        strncat(path, pid, strlen(pid)-1);
+        strncat(path, pid, strlen(pid) - 1);
         strcat(path, "/status");
-        
+
         FILE *proc_fd = fopen(path, "r");
 
-        memset(path, 0, sizeof (char) * MAX_BUFFER_SIZE);
+        char *msg = malloc(sizeof(char) * MAX_BUFFER_SIZE);
+        msg[0] = '\0';
 
-        char *msg = malloc(sizeof (char) * MAX_BUFFER_SIZE);
-        
         size_t len = 0;
-        char read;
-        char *line_out = NULL;
+        char *read;
+        char line[MAX_BUFFER_SIZE];
 
-        while ((read = getline(&line_out, &len, proc_fd)) != -1)
+        while ((read = fgets(line, sizeof(line), proc_fd)))
         {
-            if(strncmp(line_out, "Name", 4))
+            line[(int)strlen(line) - 1] = '\0';
+            if (strstr(line, "Name") != NULL || strstr(line, "State") != NULL || strstr(line, "VmSize") != NULL || strstr(line, "PPid") != NULL || strstr(line, "Uid") != NULL)
             {
-                strcat(msg, line_out);
-                strcat(msg, "; ");
-            }
-            else if(strncmp(line_out, "State", 5))
-            {
-                strcat(msg, line_out);
-                strcat(msg, "; ");
-            }
-            else if(strncmp(line_out, "Ppid", 4))
-            {
-                strcat(msg, line_out);
-                strcat(msg, "; ");
-            }
-            else if(strncmp(line_out, "Uid", 3))
-            {
-                strcat(msg, line_out);
-                strcat(msg, "; ");
-            }
-            else if(strncmp(line_out, "Vmsize", 6))
-            {
-                strcat(msg, line_out);
-                strcat(msg, "; ");
+                strcat(msg, line);
+                strcat(msg, "\n");
             }
         }
-        strcat(msg, ".");
+        msg[strlen(msg) - 1] = '\0';
         return msg;
     }
-    else return "User not connected. Please connect to run this command";
+    else
+        return "User not connected. Please connect to run this command";
 }
 
-char* exec_logout()
+char *exec_logout()
 {
     return "Logout successful";
 }
 
-char* handle_command(char command[MAX_BUFFER_SIZE], int len)
+char *handle_command(char command[MAX_BUFFER_SIZE], int len)
 {
     if (strncmp("login : ", command, 8) == 0)
     {
         char *user = command + 8;
         return exec_login(user);
     }
-    if (strncmp("get-logged-users", command, len-1) == 0)
+    if (strncmp("get-logged-users", command, len - 1) == 0)
     {
         return exec_get_logged_users();
     }
@@ -171,7 +164,7 @@ char* handle_command(char command[MAX_BUFFER_SIZE], int len)
         char *pidstr = command + 16;
         return exec_get_proc_info(pidstr);
     }
-    if (strncmp("logout", command, len-1) == 0)
+    if (strncmp("logout", command, len - 1) == 0)
     {
         return exec_logout();
     }
@@ -212,7 +205,7 @@ int main()
 
         char buf[MAX_BUFFER_SIZE];
         int no_received_bytes;
-        if((no_received_bytes = read(cli_srv_fd, buf, sizeof(buf))) < 0)
+        if ((no_received_bytes = read(cli_srv_fd, buf, sizeof(buf))) < 0)
         {
             printf("Error receiving message %d\n", errno);
             printf("%s\n", strerror(errno));
@@ -221,14 +214,14 @@ int main()
 
         buf[no_received_bytes] = '\0';
 
-        if(strncmp("quit", buf, 4) == 0)
+        if (strncmp("quit", buf, 4) == 0)
         {
             write(srv_cli_fd, "You've been disconnected", 24);
             break;
         }
 
-        if(check_message(buf, no_received_bytes) != true)
-        {   
+        if (check_message(buf, no_received_bytes) != true)
+        {
             // If message is not a command -> send message to client and don't execute it on server
             write(srv_cli_fd, "Unrecognized command!", 21);
         }
@@ -251,7 +244,7 @@ int main()
             }
 
             pid_t pid_cmd = fork();
-            if(pid_cmd > 0) // parent
+            if (pid_cmd > 0) // parent
             {
                 close(login_pipe[WRITE]);
                 close(sockets[0]);
@@ -263,45 +256,50 @@ int main()
                 write(srv_cli_fd, msg, no_bytes_msg);
                 write(srv_cli_fd, "\n", 1);
                 close(sockets[1]);
-            
+
                 char buff[10];
                 int login_len = read(login_pipe[READ], buff, 10);
                 buff[login_len] = '\0';
-                if(buff[0] == '1') is_logged = true;
-                else if(buff[0] == '0') is_logged = false;
+                if (buff[0] == '1')
+                    is_logged = true;
+                else if (buff[0] == '0')
+                    is_logged = false;
 
+                sleep(1);
                 wait(NULL);
             }
 
             else if (pid_cmd == 0) // child (that executes commands)
             {
+                printf("%d - %d\n", getpid(), getppid());
                 close(login_pipe[READ]);
                 close(sockets[1]);
 
                 char cmd_buffer[MAX_BUFFER_SIZE];
                 int len_cmd_buffer = read(sockets[0], cmd_buffer, sizeof(cmd_buffer));
                 cmd_buffer[len_cmd_buffer] = '\0';
-                
+
                 char *handler_msg = handle_command(cmd_buffer, len_cmd_buffer);
 
-                if(strncmp(handler_msg, "CONNECTED", 9) == 0) write(login_pipe[WRITE], "1", 1);
-                if(strncmp(handler_msg, "Logout successful", 17) == 0) write(login_pipe[WRITE], "0", 1);
-                
+                if (strncmp(handler_msg, "CONNECTED", 9) == 0)
+                    write(login_pipe[WRITE], "1", 1);
+                if (strncmp(handler_msg, "Logout successful", 17) == 0)
+                    write(login_pipe[WRITE], "0", 1);
+
                 write(sockets[0], handler_msg, strlen(handler_msg)); // Server sends back message to parent
                 close(sockets[0]);
 
-                //printf("%s", handler_msg);
+                // printf("%s", handler_msg);
                 break;
             }
 
-            else 
+            else
             {
                 printf("Error forking child in server (%d)", errno);
                 printf("%s\n", strerror(errno));
                 exit(EXIT_FAILURE);
             }
         }
-    
     }
 
     exit(EXIT_SUCCESS);
