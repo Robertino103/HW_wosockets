@@ -19,7 +19,7 @@
 #define WRITE 1
 #define MAX_BUFFER_SIZE 1000
 
-bool check_message(char buf[MAX_BUFFER_SIZE], int len)
+bool check_message(char buf[MAX_BUFFER_SIZE], int len) //Checking if message is really a command
 {
     if (strncmp("login : ", buf, 8) == 0)
         return true;
@@ -34,7 +34,7 @@ bool check_message(char buf[MAX_BUFFER_SIZE], int len)
     return false;
 }
 
-bool is_logged = false;
+bool is_logged = false; // flag to set if user is logged
 
 char *exec_login(char *user)
 {
@@ -93,7 +93,7 @@ char *exec_get_logged_users()
 
         FILE *fd_read = fopen("userinfo.txt", "r");
 
-        char usr_buff[1000];
+        char usr_buff[MAX_BUFFER_SIZE];
 
         while (fgets(usr_buff, sizeof(usr_buff), fd_read))
         {
@@ -130,7 +130,11 @@ char *exec_get_proc_info(char *pid)
         while ((read = fgets(line, sizeof(line), proc_fd)))
         {
             line[(int)strlen(line) - 1] = '\0';
-            if (strstr(line, "Name") != NULL || strstr(line, "State") != NULL || strstr(line, "VmSize") != NULL || strstr(line, "PPid") != NULL || strstr(line, "Uid") != NULL)
+            if (strstr(line, "Name") != NULL 
+            || strstr(line, "State") != NULL 
+            || strstr(line, "VmSize") != NULL 
+            || strstr(line, "PPid") != NULL 
+            || strstr(line, "Uid") != NULL) 
             {
                 strcat(msg, line);
                 strcat(msg, "\n");
@@ -175,15 +179,16 @@ int main()
 {
     fflush(stdout);
 
+    //####### Creating fifos : ######
     if (access("srv-cli.fifo", F_OK) == -1)
     {
         mknod("srv-cli.fifo", S_IFIFO | 0666, 0);
     }
-
     if (access("cli-srv.fifo", F_OK) == -1)
     {
         mknod("cli-srv.fifo", S_IFIFO | 0666, 0);
     }
+    //###############################################
 
     while (1)
     {
@@ -227,6 +232,7 @@ int main()
         }
         else // available command
         {
+            //###### Creating sockets for parent->child, child->parent communication ######
             int sockets[2];
             if (socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == -1)
             {
@@ -234,8 +240,9 @@ int main()
                 printf("%s\n", strerror(errno));
                 exit(EXIT_FAILURE);
             }
+            //#############################################################################
 
-            int login_pipe[2];
+            int login_pipe[2]; // Pipe used by child to return log in state (Child cannot change the global flag (is_logged var))
             if (pipe(login_pipe) == -1)
             {
                 printf("Error piping (%d)\n", errno);
@@ -279,6 +286,7 @@ int main()
                 int len_cmd_buffer = read(sockets[0], cmd_buffer, sizeof(cmd_buffer));
                 cmd_buffer[len_cmd_buffer] = '\0';
 
+                // handler_msg will hold the response to be sent back to client :
                 char *handler_msg = handle_command(cmd_buffer, len_cmd_buffer);
 
                 if (strncmp(handler_msg, "CONNECTED", 9) == 0)
@@ -289,7 +297,6 @@ int main()
                 write(sockets[0], handler_msg, strlen(handler_msg)); // Server sends back message to parent
                 close(sockets[0]);
 
-                // printf("%s", handler_msg);
                 break;
             }
 

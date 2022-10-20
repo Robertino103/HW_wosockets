@@ -14,19 +14,20 @@
 #include <utmp.h>
 #include <sys/stat.h>
 
-#define MAX_BUFFER_SIZE 100
+#define MAX_BUFFER_SIZE 1000
 
 int main()
 {
+    //####### Creating fifos ######
     if (access("srv-cli.fifo", F_OK) == -1)
     {
         mknod("srv-cli.fifo", S_IFIFO | 0666, 0);
     }
-
     if (access("cli-srv.fifo", F_OK) == -1)
     {
         mknod("cli-srv.fifo", S_IFIFO | 0666, 0);
     }
+    //#############################################
 
     char command_buffer[MAX_BUFFER_SIZE];
 
@@ -40,7 +41,6 @@ int main()
         {
             no_sent_bytes = write(cli_srv_fd, command_buffer, strlen(command_buffer));
             sleep(0.2);
-
             char rcv_msg[MAX_BUFFER_SIZE];
             rcv_msg[0] = '\0';
             int rcv_len = read(srv_cli_fd, rcv_msg, sizeof(rcv_msg));
@@ -53,7 +53,7 @@ int main()
             rcv_msg[rcv_len] = '\0';
             printf("%s\n", rcv_msg);
 
-            if(strncmp("You've been disconnected", rcv_msg, 24) == 0)
+            if(strncmp("You've been disconnected", rcv_msg, 24) == 0) //Break client at disconnect (quit command)
             {
                 return 0;
             }
