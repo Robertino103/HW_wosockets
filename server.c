@@ -84,7 +84,8 @@ char *exec_get_logged_users()
         {
             if (info->ut_type == USER_PROCESS)
             {
-                fprintf(fd, "%s - %s - %d:%d\n", info->ut_user, info->ut_host, info->ut_tv.tv_sec, info->ut_tv.tv_usec);
+                //fprintf(fd, "%s - %s - %d:%d\n", info->ut_user, info->ut_host, info->ut_tv.tv_sec, info->ut_tv.tv_usec);
+                fprintf(fd, "%s - %s - %25s:%25s\n", info->ut_user, info->ut_host, ctime((time_t *)&(info->ut_tv.tv_sec)), ctime((time_t *)&(info->ut_tv.tv_usec)));
             }
             info = getutent();
         }
